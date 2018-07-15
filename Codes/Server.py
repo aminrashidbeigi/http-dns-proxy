@@ -1,31 +1,31 @@
-import socket
 import json
 import dns.resolver
 import redis
+from flask import Flask, request
+
 
 port = 5555
-host = '0.0.0.0'
-socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-socket.bind((host, port))
-socket.listen(1)
-connect, address = socket.accept()
-print('Connected by', address)
-while True:
-    client_request_json = connect.recv(1024)
-    if not client_request_json:
-        break
-    client_request = json.loads(str(client_request_json, encoding="utf_8"))
+host = '127.0.0.1'
+
+app = Flask(__name__)
+@app.route('/', methods = ['POST'])
+def client_service():
+    client_request = json.loads(str(request.data, encoding="utf_8"))
     dns_type = client_request['dns_type']
+    r = redis.StrictRedis(host='localhost', port=6379, db=0)
     dns_target = client_request['dns_target']
     dns_server = client_request['dns_server']
-    redis = redis.StrictRedis(host='localhost', port=6379, db=0)
-    dns_message = redis.get('dns:' + str(dns_target))
-    if not redis.get('dns:' + str(dns_target)):
+    dns_message = r.get('dns:' + str(dns_target))
+    if not r.get('dns:' + str(dns_target)):
         dns_resolver = dns.resolver.Resolver()
+        dns_resolver.timeout = 1
+        dns_resolver.lifetime = 1
         query = dns.message.make_query(dns_target, dns_type)
         dns_message = dns.query.udp(query, dns_server)
-        redis.set('dns:' + str(dns_target), dns_message)
-    connect.send(bytes(str(dns_message), encoding='utf_8'))
-    for key in redis.scan_iter("dns:*"):
-        print(key)
-connect.close()
+        r.set('dns:' + str(dns_target), dns_message)
+    # for key in r.scan_iter("dns:*"):
+    #     print(key)
+    return str(dns_message)
+
+if __name__ == '__main__':
+    app.run(host="127.0.0.1", port=5555)

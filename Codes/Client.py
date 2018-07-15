@@ -1,19 +1,16 @@
-import socket
 import json
+import requests
 
 port = 5555
 host = 'localhost'
 dns_type = 'A'
 dns_target = 'aut.ac.ir'
 dns_server = '8.8.8.8'
-socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-socket.connect((host, port))
-socket.send(bytes(json.dumps({
+body = json.dumps({
     'dns_type': dns_type,
     'dns_target': dns_target,
     'dns_server': dns_server
-}), encoding="utf_8"))
+})
+r = requests.post('http://127.0.0.1:5555/', body)
 
-response = socket.recv(1024)
-socket.close()
-print('Received', repr(response))
+print('Received', r.text)
