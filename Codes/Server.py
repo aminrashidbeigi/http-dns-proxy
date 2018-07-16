@@ -1,4 +1,4 @@
- import json
+import json
 import dns.resolver
 import redis
 from flask import Flask, request
@@ -15,23 +15,32 @@ def client_service():
     dns_type = client_request['dns_type']
     dns_target = client_request['dns_target']
     dns_server = client_request['dns_server']
-    print("is here")
-    dns_message = r.get('dns:' + str(dns_target))
-    if not r.get('dns:' + str(dns_target)):
-        dns_resolver = dns.resolver.Resolver()
-        dns_resolver.timeout = 1
-        dns_resolver.lifetime = 1
-        query = dns.message.make_query(dns_target, dns_type)
-        dns_message = dns.query.udp(query, dns_server)
-        r.set('dns:' + str(dns_target), dns_message)
-    if dns_type is 'A':
-        return str(dns_message)
-    elif dns_type is 'CNAME':
-        dns_message = dns.resolver.query('mail.google.com', 'CNAME')
-        print('query qname:', dns_message.qname, ' num ans.', len(dns_message))
-        for data in dns_message:
-            print(' cname target address:', data.target)
-        return str(dns_message)
+    answer_for_client_in_cache = r.get('dns:' + str(dns_target) + str(dns_type))
+    answer_for_client = {
+        'authoritative': 0,
+        'result': []
+    }
+    if not r.get('dns:' + str(dns_target) + str(dns_type)):
+        print("Response from dns server.")
+        if dns_type == 'A':
+            query = dns.resolver.query(dns_target, dns_type)
+            make_query = dns.message.make_query(dns_target, dns_type)
+            udp_message = dns.query.udp(make_query, dns_server)
+            answer_for_client['authoritative'] = udp_message.flags & dns.flags.AA
+            for data in query:
+                answer_for_client['result'].append(data.to_text())
+        elif dns_type == 'CNAME':
+            query = dns.resolver.query(dns_target, dns_type)
+            make_query = dns.message.make_query(dns_target, dns_type)
+            udp_message = dns.query.udp(make_query, dns_server)
+            answer_for_client['authoritative'] = udp_message.flags & dns.flags.AA
+            for data in query:
+                answer_for_client['result'].append(data.to_text())
+        r.set('dns:' + str(dns_target) + str(dns_type), answer_for_client)
+        return str(answer_for_client)
+    else:
+        print("Response from cache :)")
+        return str(answer_for_client_in_cache)
 
 if __name__ == '__main__':
     app.run(host="127.0.0.1", port=5555)
