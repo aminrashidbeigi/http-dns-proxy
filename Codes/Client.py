@@ -3,7 +3,7 @@ import requests
 
 port = 5555
 host = 'localhost'
-dns_type = 'A'
+dns_type = 'CNAME'
 dns_target = 'aut.ac.ir'
 dns_server = '8.8.8.8'
 body = json.dumps({
