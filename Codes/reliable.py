@@ -61,9 +61,7 @@ class ReliableUDP:
     def send(self, message):
 
         packets = self.make_packets(message)
-
         number_of_packets = len(packets)
-
         window_size = min(self.WINDOW_SIZE, number_of_packets - self.base)
 
         next_to_send = 0
@@ -117,10 +115,10 @@ class ReliableUDP:
                 self.mutex.release()
 
     def make_packets(self, message):
-
+        print(message)
         byte_request = bytes(message, "utf-8")
         packets = []
-        sequence_number = 0
+        sequence_number = 1
         first, last = 0, self.packet_size
 
         if last < len(byte_request):
@@ -133,6 +131,8 @@ class ReliableUDP:
         else:
             packets.append(pack((sequence_number % 16), byte_request[first:len(byte_request)]))
 
+        packets.insert(0, pack(0, len(packets).to_bytes(20, byteorder="little", signed=True)))
+
         return packets
 
     def receive(self):
@@ -140,9 +140,18 @@ class ReliableUDP:
         expected_sequence_number = 0
         message = bytes()
 
+        number_of_packets = 0
+
+        i =0
+
         while True:
             pkt, address = self.sock.recvfrom(self.buffer_size)
             sequence_number, data = unpack(packet=pkt)
+
+            if i == 0:
+                number_of_packets = int.from_bytes(data, byteorder="little", signed=True)
+
+            i = -1
 
             print("sending ack with sequence number: ", sequence_number)
 
@@ -157,8 +166,10 @@ class ReliableUDP:
                 pkt = pack(sequence_number - 1)
                 self.sock.sendto(pkt, address)
 
-            if self.dest == "client":
+            if number_of_packets == 0:
                 break
+
+            number_of_packets -= 1
 
         return message
 
@@ -171,4 +182,5 @@ def unpack(packet):
 def pack(sequence_number, data=b''):
     sequence_bytes = sequence_number.to_bytes(4, byteorder='little', signed=True)
     return sequence_bytes + data
+
 
