@@ -34,7 +34,7 @@ class ReliableUDP:
         self.dest = dest
         self.sock = sock
 
-        self.packet_size = 1024
+        self.packet_size = 30000
 
         self.proxy_address = 'localhost'
         self.proxy_port = proxy_port
@@ -56,7 +56,7 @@ class ReliableUDP:
         self.send_timer = self.Timer(self.TIMEOUT_INTERVAL)
         self.base = 0
 
-        self.buffer_size = 1024
+        self.buffer_size = 30004
 
     def send(self, message):
 
@@ -115,8 +115,11 @@ class ReliableUDP:
                 self.mutex.release()
 
     def make_packets(self, message):
-        print(message)
-        byte_request = bytes(message, "utf-8")
+        byte_request = message
+
+        if self.dest == "proxy":
+            byte_request = bytes(message, "utf-8")
+
         packets = []
         sequence_number = 1
         first, last = 0, self.packet_size
@@ -124,14 +127,18 @@ class ReliableUDP:
         if last < len(byte_request):
 
             while last < len(byte_request):
+
                 packets.append(pack((sequence_number % 16), byte_request[first:min(last, len(byte_request))]))
                 first = copy.deepcopy(last)
                 last = first + self.packet_size
                 sequence_number += 1
+
+            packets.append(pack((sequence_number % 16), byte_request[first:len(byte_request)]))
+
         else:
             packets.append(pack((sequence_number % 16), byte_request[first:len(byte_request)]))
 
-        packets.insert(0, pack(0, len(packets).to_bytes(20, byteorder="little", signed=True)))
+        packets.insert(0, pack(0, (len(packets)).to_bytes(20, byteorder="little", signed=True)))
 
         return packets
 
@@ -142,33 +149,37 @@ class ReliableUDP:
 
         number_of_packets = 0
 
-        i =0
+        i = 0
 
         while True:
             pkt, address = self.sock.recvfrom(self.buffer_size)
             sequence_number, data = unpack(packet=pkt)
+            # print(sequence_number, data)
 
             if i == 0:
                 number_of_packets = int.from_bytes(data, byteorder="little", signed=True)
 
-            i = -1
+
+            # print(number_of_packets)
 
             print("sending ack with sequence number: ", sequence_number)
 
             if sequence_number == expected_sequence_number:
-                message += data
+                if i != 0:
+                    message += data
                 pkt = pack(sequence_number)
                 self.sock.sendto(pkt, address)
                 expected_sequence_number += 1
                 expected_sequence_number %= 16
             else:
-                print("sending ack with sequence number: ", sequence_number - 1)
-                pkt = pack(sequence_number - 1)
+                print("sending ack with sequence number: nack actually ", expected_sequence_number - 1)
+                pkt = pack(expected_sequence_number - 1)
                 self.sock.sendto(pkt, address)
 
             if number_of_packets == 0:
                 break
 
+            i = -1
             number_of_packets -= 1
 
         return message
