@@ -13,8 +13,9 @@ if __name__ == '__main__':
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(client1)
     reliable_udp = ReliableUDP(sock, "proxy", 5000, 2500)
-    # request = "GET / HTTP/1.1\r\nHost: http://aut.ac.ir"
-    request = "GET / HTTP/1.1\r\nHost: http://www.google.com/"
+    # request = "GET / HTTP/1.1\r\nHost: http://aut.ac.ir/"
+    # request = "GET / HTTP/1.1\r\nHost: http://img.p30download.com/mac/image/2018/01/1515129443_3.jpg"
+    request = "GET / HTTP/1.1\r\nHost: https://hw19.cdn.asset.aparat.com/aparat-video/131bd8138752fb07b71be9e6b3c7605611248968-720p__20585.mp4"
     reliable_udp.send(request)
     sock.close()
 
@@ -22,11 +23,15 @@ if __name__ == '__main__':
     sock1.bind(client2)
     reliable_udp = ReliableUDP(sock1, "proxy", 5001, 2501)
     message = reliable_udp.receive()
-    message = message[20:]
+
+    # print(len(message))
+
     if message == b'404':
         print("404 error !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! YOU LOSE")
     else:
-        print(message.decode("utf-8"))
+        file = open("result", "wb")
+        file.write(message)
+        file.close()
 
     sock1.close()
 
